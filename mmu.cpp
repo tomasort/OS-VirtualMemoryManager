@@ -9,6 +9,8 @@
 
 using namespace std;
 
+#define MAX_VPAGES 64
+#define MAX_FRAMES 128
 
 class VirtualMemoryArea{
 public:
@@ -25,10 +27,6 @@ public:
     }
 };
 
-class Process{
-public:
-    vector<VirtualMemoryArea*> virtual_memory_areas;
-};
 
 class Instruction{
     // This class represents a single instruction in this simulation
@@ -45,7 +43,7 @@ class Frame{
 public:
 };
 
-class Paging{
+class Pager{
 public:
     // Pure virtual function
     virtual Frame* select_victim_frame() = 0;
@@ -54,18 +52,75 @@ public:
 class PageTableEntry{
 public:
     unsigned page_frame:7;
-    unsigned valid:1;
+    unsigned present:1;
     unsigned referenced:1;
     unsigned modified:1;
     unsigned write_protected:1;
     unsigned pagedout:1;
     unsigned other:20;
+
+    PageTableEntry(){
+        present = referenced = modified = write_protected = pagedout = other = page_frame = 0;
+    }
+};
+
+class Process{
+public:
+    vector<VirtualMemoryArea*> virtual_memory_areas;
+    PageTableEntry page_table[MAX_VPAGES];
 };
 
 int* random_values = nullptr;
 int number_of_random_values;
 vector<Process*> processes;
 vector<Instruction*> instructions;
+Frame frame_table[MAX_FRAMES];
+
+class FIFO : public Pager{
+public:
+    // Pure virtual function
+    virtual Frame* select_victim_frame(){
+        return nullptr;
+    };
+};
+class Random : public Pager{
+public:
+    // TODO: implement random pager
+    virtual Frame* select_victim_frame(){
+        return nullptr;
+    };
+};
+class Clock : public Pager{
+public:
+    // TODO: implement Clock pager
+    virtual Frame* select_victim_frame(){
+        return nullptr;
+    };
+};
+
+class EnhancedSecondChance : public Pager{
+public:
+    // TODO: Implement EnhancedSecondChance pager
+    virtual Frame* select_victim_frame(){
+        return nullptr;
+    };
+};
+
+class Aging : public Pager{
+public:
+    // TODO: Implement Aging pager
+    virtual Frame* select_victim_frame(){
+        return nullptr;
+    };
+};
+
+class WorkingSet : public Pager{
+public:
+    // TODO: Implement WorkingSet pager
+    virtual Frame* select_victim_frame(){
+        return nullptr;
+    };
+};
 
 void read_random_file(const string& file_name){
     // Function that takes the name of a file with random numbers and stores them in a global variable called random_values
@@ -123,27 +178,71 @@ void read_input_file(const string& file_name){
         if (line.at(0) == '#') continue;  // Ignoring all the comments
         stringstream instruction_line;
         instruction_line << line;
-        Instruction *current_instruction = new Instruction();
-        instruction_line >> current_instruction->command >> current_instruction->argument;
+        auto *current_instruction = new Instruction();
+        instruction_line >> current_instruction->cmd >> current_instruction->arg;
         instructions.push_back(current_instruction);
     }
 }
 
 class Simulation{
+    int instruction_offset = 0;
+    Process *current_process;
+    Instruction* current_instruction;
 public:
+    Pager *pager;
+    Simulation(Pager *p){
+        pager = p;
+    }
+
+    Frame *allocate_frame_from_free_list(){
+        // This function finds a frame in the pool of free frames
+        // TODO: implement me (allocate_frame_from_free_list)
+        return nullptr;
+    }
+
+    Frame *get_frame(){
+        // This functions return a pointer to a frame that we can either use or we can replace
+        Frame *frame = allocate_frame_from_free_list();  // allocate frame from free list
+        if (frame == nullptr){  // if we are out of free frames then call the pager
+            frame = pager->select_victim_frame();
+        }
+        return frame;
+    }
+
+    bool get_next_instruction(Instruction *instruction){
+        if (instruction_offset >= instructions.size()) return false;
+        instruction = instructions[instruction_offset++];
+        return true;
+    }
+
     void run_simulation(){
         cout << "Running simulation!" << endl;
+        while(get_next_instruction(current_instruction)){
+            // TODO: handle instructions "e" and "c"
+            PageTableEntry *pte = &(current_process->page_table[current_instruction->arg]);
+            if (!pte->present){
+                // verify this is actually a valid page in a VMA if not raise an ERROR and go to the next instruction
+                Frame *frame = get_frame();
+            }
+            // check the write protection of pte
+            // update the referenced and modified bits of pte
+        }
     }
 };
 
 
 
 int main(int argc, char* argv[]){
-    // TODO: user getopt to find the flags, input file and output file.
+    // TODO: use getopt to find the flags, input file and output file.
+    // This is going to be replace by getopt at some point
     string input_file = "/Users/tomasortega/Desktop/os_lab3/lab3_assign/inputs/in3";
     string rfile = "/Users/tomasortega/Desktop/os_lab3/lab3_assign/inputs/rfile";
-    cout << sizeof(PageTableEntry) << endl;
+    Pager *pager = new FIFO;
     read_input_file(input_file);
     read_random_file(rfile);
+
+    // Start the simulation
+    Simulation s(pager);
+    s.run_simulation();
     return 0;
 }
