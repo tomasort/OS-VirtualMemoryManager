@@ -1,4 +1,5 @@
 #include <iostream>
+#include <exception>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -11,6 +12,13 @@ using namespace std;
 
 #define MAX_VPAGES 64
 #define MAX_FRAMES 128
+
+class INV_ARG_EXCEPTION: public exception
+{
+    const char* what() const noexcept override{
+        return "My exception happened";
+    }
+};
 
 class VirtualMemoryArea{
 public:
@@ -27,7 +35,6 @@ public:
     }
 };
 
-
 class Instruction{
     // This class represents a single instruction in this simulation
     //      c: context switch to another process. In this instruction the argument is the new process
@@ -41,17 +48,22 @@ public:
 
 class Frame{
 public:
+    unsigned frame_number:7;
+    Frame(){
+        frame_number = 0;
+    }
 };
 
 class Pager{
 public:
+    // The select_victim_frame function returns a victim frame
     // Pure virtual function
     virtual Frame* select_victim_frame() = 0;
 };
 
 class PageTableEntry{
 public:
-    unsigned page_frame:7;
+    unsigned frame:7;
     unsigned present:1;
     unsigned referenced:1;
     unsigned modified:1;
@@ -60,40 +72,46 @@ public:
     unsigned other:20;
 
     PageTableEntry(){
-        present = referenced = modified = write_protected = pagedout = other = page_frame = 0;
+        present = referenced = modified = write_protected = pagedout = other =  0;
     }
 };
 
 class Process{
+    // This class represents a process with a virtual address space
 public:
-    vector<VirtualMemoryArea*> virtual_memory_areas;
-    PageTableEntry page_table[MAX_VPAGES];
+    vector<VirtualMemoryArea*> virtual_memory_areas;  // vector of virtual memory areas for a specific process.
+    // There might be holes between virtual memory areas.
+    // page_table represents the translations from virtual pages to page frames.
+    PageTableEntry page_table[MAX_VPAGES];  // stores the PageTableEntry objects
 };
 
 int* random_values = nullptr;
 int number_of_random_values;
 vector<Process*> processes;
 vector<Instruction*> instructions;
-Frame frame_table[MAX_FRAMES];
+Frame frame_table[MAX_FRAMES];  //Provide this reverse mapping (frame => <proc-id,vpage>) inside each frame’s frame table entry.
 
 class FIFO : public Pager{
 public:
     // Pure virtual function
-    virtual Frame* select_victim_frame(){
+    Frame* select_victim_frame() override{
+        // This function selects a frame to UNMAP
         return nullptr;
     };
 };
 class Random : public Pager{
 public:
     // TODO: implement random pager
-    virtual Frame* select_victim_frame(){
+    Frame* select_victim_frame() override{
+        // This function selects a frame to UNMAP
         return nullptr;
     };
 };
 class Clock : public Pager{
 public:
     // TODO: implement Clock pager
-    virtual Frame* select_victim_frame(){
+    Frame* select_victim_frame() override{
+        // This function selects a frame to UNMAP
         return nullptr;
     };
 };
@@ -101,7 +119,8 @@ public:
 class EnhancedSecondChance : public Pager{
 public:
     // TODO: Implement EnhancedSecondChance pager
-    virtual Frame* select_victim_frame(){
+    Frame* select_victim_frame() override{
+        // This function selects a frame to UNMAP
         return nullptr;
     };
 };
@@ -109,7 +128,8 @@ public:
 class Aging : public Pager{
 public:
     // TODO: Implement Aging pager
-    virtual Frame* select_victim_frame(){
+    Frame* select_victim_frame() override{
+        // This function selects a frame to UNMAP
         return nullptr;
     };
 };
@@ -117,7 +137,8 @@ public:
 class WorkingSet : public Pager{
 public:
     // TODO: Implement WorkingSet pager
-    virtual Frame* select_victim_frame(){
+    Frame* select_victim_frame() override{
+        // This function selects a frame to UNMAP
         return nullptr;
     };
 };
@@ -185,10 +206,10 @@ void read_input_file(const string& file_name){
 }
 
 class Simulation{
-    int instruction_offset = 0;
-    Process *current_process;
-    Instruction* current_instruction;
 public:
+    int instruction_number = 0;
+    Process *current_process;
+    Instruction* current_instruction = nullptr;
     Pager *pager;
     Simulation(Pager *p){
         pager = p;
@@ -209,20 +230,62 @@ public:
         return frame;
     }
 
-    bool get_next_instruction(Instruction *instruction){
-        if (instruction_offset >= instructions.size()) return false;
-        instruction = instructions[instruction_offset++];
+    void page_fault_handler(int virtual_page){
+        // verify this is actually a valid page in a VMA if not raise an ERROR and go to the next instruction
+        cout << "Starting the page fault handler" << endl;
+        bool is_valid = false;
+        for (VirtualMemoryArea *vma : current_process->virtual_memory_areas){
+            if (vma->start_page < virtual_page && virtual_page < vma->end_page){
+                is_valid = true;
+            }
+        }
+        if (!is_valid) {
+            throw INV_ARG_EXCEPTION();
+        }
+        // if the virtual_page is part of a VMA then allocate a frame and assign it to the PTE belonging to the virtual_page of this instruction.
+        Frame *new_frame = get_frame();
+        int old_frame = current_process->page_table[virtual_page].frame;
+        cout << old_frame;
+        // Populate the new frame
+        // The population depends whether this page (the old frame) was previously paged out (in which case the page must be brought back
+        // from the swap space (“IN”) or (“FIN” in case it is a memory mapped file). If the vpage was never swapped out and
+        // is not file mapped, then by definition it still has a zero filled content and you issue the “ZERO” output.
+        // current_process->page_table[virtual_page].frame = new_frame->frame_number;
+
+        // you must inspect the state of the R and M bits. If the page was modified, then the page frame must be paged out
+        // to the swap device (“OUT”) or in case it was file mapped written back to the file (“FOUT”)
+
+    }
+
+    bool get_next_instruction(Instruction **instruction){
+        if (instruction_number >= instructions.size()) return false;
+        *instruction = instructions[instruction_number++];
         return true;
     }
 
     void run_simulation(){
         cout << "Running simulation!" << endl;
-        while(get_next_instruction(current_instruction)){
-            // TODO: handle instructions "e" and "c"
+        while(get_next_instruction(&current_instruction)){
+            char current_command= current_instruction->cmd;
+            int current_argument= current_instruction->arg;
+
+            if (current_command == 'e'){  // We need to exit
+                cout << "The command is e!";
+                continue;
+            }else if (current_command == 'c'){  // Do a context switch
+                current_process = processes[current_argument];
+                continue;
+            }
+
+            // Handle the instructions "r" and "w"
             PageTableEntry *pte = &(current_process->page_table[current_instruction->arg]);
             if (!pte->present){
-                // verify this is actually a valid page in a VMA if not raise an ERROR and go to the next instruction
-                Frame *frame = get_frame();
+                // The hardware would raise a page fault exception.
+                try{
+                    page_fault_handler(current_argument);
+                } catch (INV_ARG_EXCEPTION &e){
+                    cout << "SEGV" << endl;
+                }
             }
             // check the write protection of pte
             // update the referenced and modified bits of pte
@@ -240,7 +303,7 @@ int main(int argc, char* argv[]){
     Pager *pager = new FIFO;
     read_input_file(input_file);
     read_random_file(rfile);
-
+    cout << sizeof(PageTableEntry) << endl;
     // Start the simulation
     Simulation s(pager);
     s.run_simulation();
