@@ -1,22 +1,50 @@
+// name: Tomas Ortega
+// OS class lab 3 memory
+// the cost of each operation is:
+// maps=300, unmaps=400, ins=3100, outs=2700, fins=2800, fouts=2400, zeros=140, segv=340, segprot=420
+
 #include <iostream>
 #include <exception>
 #include <fstream>
-#include <string>
 #include <sstream>
+#include <string>
 #include <queue>
 #include <vector>
 #include <list>
-#include <iomanip>
+#include <getopt.h>
 
 using namespace std;
 
 #define MAX_VPAGES 64
 #define MAX_FRAMES 128
+bool O_option;
+bool P_option;
+bool F_option;
+bool S_option;
+bool x_option;
+bool y_option;
+bool f_option;
+bool a_option;
 
-class INV_ARG_EXCEPTION: public exception
-{
+#define O_trace(fmt...) do { if (O_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+#define P_trace(fmt...) do { if (P_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+#define F_trace(fmt...) do { if (F_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+#define S_trace(fmt...) do { if (S_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+#define x_trace(fmt...) do { if (x_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+#define y_trace(fmt...) do { if (y_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+#define f_trace(fmt...) do { if (f_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+#define a_trace(fmt...) do { if (a_option) { printf(fmt); printf("\n"); fflush(stdout); } } while(0)
+
+
+class INVALID_VPAGE_EXCEPTION: public exception{
     const char* what() const noexcept override{
-        return "My exception happened";
+        return "Invalid vpage!";
+    }
+};
+
+class WRITE_PROTECTED_EXCEPTION: public exception{
+    const char* what() const noexcept override{
+        return "Invalid vpage!";
     }
 };
 
@@ -48,11 +76,23 @@ public:
 
 class Frame{
 public:
-    unsigned frame_number:7;
+    int process_id;
+    int vpage;
+    int frame_id;
+    int initialized;
+
     Frame(){
-        frame_number = 0;
+        initialized = 0;
+    }
+    string print(){
+        if (initialized){
+            string s = to_string(process_id) + ":" + to_string(vpage);
+            return s;
+        }
+        return "*";
     }
 };
+
 
 class Pager{
 public:
@@ -69,34 +109,110 @@ public:
     unsigned modified:1;
     unsigned write_protected:1;
     unsigned pagedout:1;
-    unsigned other:20;
+    unsigned file_mapped:1;
+    unsigned is_valid_vma:1;
+    unsigned swap_area:1;
+    unsigned other:16;
 
     PageTableEntry(){
-        present = referenced = modified = write_protected = pagedout = other =  0;
+        frame = file_mapped = swap_area = is_valid_vma = present = referenced = modified = write_protected = pagedout = other =  0;
+
+    }
+    string print(){
+        // # for not valid entries that have been swapped out
+        // * for not valid entries that don't have a swap are associated with them.
+        if (pagedout && !present){
+            return "#";
+        }
+        if (!is_valid_vma || !present){
+            return "*";
+        }
+        string s = "";
+        if (referenced){
+            s = s + "R";
+        }else{
+            s = s + "-";
+        }
+        if (modified){
+            s = s + "M";
+        }else{
+            s = s + "-";
+        }
+        if (pagedout){
+            s = s + "S";
+        }else{
+            s = s + "-";
+        }
+        return  s;
     }
 };
 
 class Process{
     // This class represents a process with a virtual address space
 public:
-    vector<VirtualMemoryArea*> virtual_memory_areas;  // vector of virtual memory areas for a specific process.
+    static int process_counter;
+    int process_id;
+    unsigned long maps=0;
+    unsigned long unmaps=0;
+    unsigned long  ins=0;
+    unsigned long outs=0;
+    unsigned long fins=0;
+    unsigned long fouts=0;
+    unsigned long zeros=0;
+    unsigned long segv=0;
+    unsigned long segprot=0;
     // There might be holes between virtual memory areas.
+    vector<VirtualMemoryArea*> virtual_memory_areas;  // vector of virtual memory areas for a specific process.
     // page_table represents the translations from virtual pages to page frames.
     PageTableEntry page_table[MAX_VPAGES];  // stores the PageTableEntry objects
+    Process(){
+        process_id = process_counter;
+        process_counter++;
+    }
+    string print_page_table(){
+        string s = "PT[" + to_string(process_id) + "]: ";
+        for (int i = 0; i < MAX_VPAGES; i++){
+            PageTableEntry p = page_table[i];
+            string pte_string = p.print();
+            if (pte_string == "*" || pte_string == "#"){
+                s = s + p.print();
+            }else{
+                s = s + to_string(i) + ":" + p.print();
+            }
+            if (i < MAX_VPAGES-1){
+                s = s + " ";
+            }
+        }
+        return s;
+    }
 };
 
+int Process::process_counter = 0;
 int* random_values = nullptr;
 int number_of_random_values;
+int number_of_frames;
 vector<Process*> processes;
 vector<Instruction*> instructions;
-Frame frame_table[MAX_FRAMES];  //Provide this reverse mapping (frame => <proc-id,vpage>) inside each frame’s frame table entry.
+Frame *frame_table;  //Provide this reverse mapping (frame => <proc-id,vpage>) inside each frame’s frame table entry.
+
+
+string print_frame_table(){
+    string s = "FT: ";
+    for (int i = 0; i < number_of_frames; i++){
+        s = s + frame_table[i].print();
+        if (i < number_of_frames-1){
+            s = s + " ";
+        }
+    }
+    return s;
+}
 
 class FIFO : public Pager{
 public:
-    // Pure virtual function
+    int hand = 0;
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
-        return nullptr;
+        return &frame_table[(hand++)%number_of_frames];
     };
 };
 class Random : public Pager{
@@ -115,7 +231,6 @@ public:
         return nullptr;
     };
 };
-
 class EnhancedSecondChance : public Pager{
 public:
     // TODO: Implement EnhancedSecondChance pager
@@ -124,7 +239,6 @@ public:
         return nullptr;
     };
 };
-
 class Aging : public Pager{
 public:
     // TODO: Implement Aging pager
@@ -133,7 +247,6 @@ public:
         return nullptr;
     };
 };
-
 class WorkingSet : public Pager{
 public:
     // TODO: Implement WorkingSet pager
@@ -153,13 +266,13 @@ void read_random_file(const string& file_name){
     }
 }
 
-int get_random(int size){
+int get_random(){
     // Function that returns a "random" value using the number in the file provided by the user
     static int offset = 0;
     if (offset >= number_of_random_values){
         offset = 0;
     }
-    int random_number = 1 + random_values[offset++]%size;
+    int random_number = 1 + random_values[offset++]%number_of_frames;
     return random_number;
 }
 
@@ -207,18 +320,37 @@ void read_input_file(const string& file_name){
 
 class Simulation{
 public:
-    int instruction_number = 0;
     Process *current_process;
     Instruction* current_instruction = nullptr;
+    queue<Frame*> free_list;
     Pager *pager;
+
+    // stats
+    unsigned long instruction_number = 0;
+    unsigned long process_exits = 0;
+    unsigned long long total_cost = 0;
+    unsigned long ctx_switches = 0;
+
     Simulation(Pager *p){
         pager = p;
+        frame_table = new Frame[number_of_frames];
+        for (int i = 0; i < number_of_frames; i++){
+            frame_table[i] = Frame();
+            frame_table[i].frame_id = i;
+        }
+        for (int i = 0; i < number_of_frames; i++){
+            free_list.push(&frame_table[i]);
+        }
     }
 
     Frame *allocate_frame_from_free_list(){
         // This function finds a frame in the pool of free frames
-        // TODO: implement me (allocate_frame_from_free_list)
-        return nullptr;
+        if (free_list.empty()){
+            return nullptr;
+        }
+        Frame* free_frame = free_list.front();
+        free_list.pop();
+        return free_frame;
     }
 
     Frame *get_frame(){
@@ -231,30 +363,78 @@ public:
     }
 
     void page_fault_handler(int virtual_page){
+        // The frame table can only be accessed as part of the “simulated page fault handler”
         // verify this is actually a valid page in a VMA if not raise an ERROR and go to the next instruction
-        cout << "Starting the page fault handler" << endl;
-        bool is_valid = false;
-        for (VirtualMemoryArea *vma : current_process->virtual_memory_areas){
-            if (vma->start_page < virtual_page && virtual_page < vma->end_page){
-                is_valid = true;
+        PageTableEntry *pte = &(current_process->page_table[virtual_page]);
+        if (!pte->is_valid_vma){
+            for (VirtualMemoryArea *vma : current_process->virtual_memory_areas){
+                if (vma->start_page <= virtual_page && virtual_page <= vma->end_page){
+                    pte->is_valid_vma = 1;
+                    // At this point you can store bits in the PageTableEntry based on what you found in the VMA
+                    // and what bits are not occupied by the mandatory bits
+                    pte->file_mapped = vma->file_mapped;
+                    pte->write_protected = vma->write_protected;
+                }
             }
-        }
-        if (!is_valid) {
-            throw INV_ARG_EXCEPTION();
+            if (!pte->is_valid_vma) {
+                throw INVALID_VPAGE_EXCEPTION();
+            }
         }
         // if the virtual_page is part of a VMA then allocate a frame and assign it to the PTE belonging to the virtual_page of this instruction.
         Frame *new_frame = get_frame();
-        int old_frame = current_process->page_table[virtual_page].frame;
-        cout << old_frame;
-        // Populate the new frame
-        // The population depends whether this page (the old frame) was previously paged out (in which case the page must be brought back
-        // from the swap space (“IN”) or (“FIN” in case it is a memory mapped file). If the vpage was never swapped out and
-        // is not file mapped, then by definition it still has a zero filled content and you issue the “ZERO” output.
+        pte->frame = new_frame->frame_id;
+        if (new_frame->initialized){
+            current_process->unmaps += 1;
+            total_cost += 400;
+            O_trace("UNMAP %s", new_frame->print().c_str());
+            int old_vpage = new_frame->vpage;
+            PageTableEntry *old_pte = &(processes[new_frame->process_id]->page_table[old_vpage]);
+            old_pte->present = 0;
+            if (old_pte->modified){
+                old_pte->pagedout = 1;
+                if (old_pte->file_mapped){
+                    current_process->fouts += 1;
+                    total_cost += 2400;
+                    O_trace("FOUT");
+                }else{
+                    current_process->outs += 1;
+                    total_cost += 2700;
+                    O_trace("OUT");
+                }
+            }
+        }
+        if (pte->pagedout || pte->file_mapped){
+            if (pte->file_mapped){
+                current_process->fins += 1;
+                total_cost += 2800;
+                O_trace("FIN");
+            }else{
+                current_process->ins += 1;
+                total_cost += 3100;
+                O_trace("IN");
+            }
+        }else if (!new_frame->initialized || (!pte->pagedout && !pte->file_mapped)){
+            current_process->zeros += 1;
+            total_cost += 140;
+            O_trace("ZERO");
+        }
+        // Populate new_frame
+        new_frame->process_id = current_process->process_id;
+        new_frame->vpage = virtual_page;
+        new_frame->initialized = 1;
+        pte->present = 1;
+        pte->modified = 0;
+        // if paged out (the page must be brought back from the swap space (“IN”) or (“FIN” in case it is a memory mapped file).
+        // If the vpage was never swapped out and is not file mapped,
+        // then by definition it still has a zero filled content and you issue the “ZERO” output.
+        // The population depends whether the vpage (in the frame) was previously paged out
         // current_process->page_table[virtual_page].frame = new_frame->frame_number;
 
         // you must inspect the state of the R and M bits. If the page was modified, then the page frame must be paged out
         // to the swap device (“OUT”) or in case it was file mapped written back to the file (“FOUT”)
-
+        current_process->maps += 1;
+        total_cost += 300;
+        O_trace("MAP %d", new_frame->frame_id);
     }
 
     bool get_next_instruction(Instruction **instruction){
@@ -264,31 +444,64 @@ public:
     }
 
     void run_simulation(){
-        cout << "Running simulation!" << endl;
         while(get_next_instruction(&current_instruction)){
             char current_command= current_instruction->cmd;
             int current_argument= current_instruction->arg;
-
+            O_trace("%lu: ==> %c %d", instruction_number - 1, current_instruction->cmd, current_instruction->arg);
             if (current_command == 'e'){  // We need to exit
                 cout << "The command is e!";
+                process_exits++;
+                total_cost += 1250;
                 continue;
             }else if (current_command == 'c'){  // Do a context switch
+                total_cost += 130;
+                ctx_switches++;
                 current_process = processes[current_argument];
                 continue;
             }
 
             // Handle the instructions "r" and "w"
+            total_cost++;
             PageTableEntry *pte = &(current_process->page_table[current_instruction->arg]);
             if (!pte->present){
                 // The hardware would raise a page fault exception.
                 try{
                     page_fault_handler(current_argument);
-                } catch (INV_ARG_EXCEPTION &e){
-                    cout << "SEGV" << endl;
-                }
+                    if (current_command == 'w' || current_command == 'r') pte->referenced = 1;
+                    if (current_command == 'w' && pte->write_protected) throw WRITE_PROTECTED_EXCEPTION();
+                } catch (INVALID_VPAGE_EXCEPTION &e){
+                    total_cost += 340;
+                    current_process->segv += 1;
+                    f_trace("%s", "SEGV");
+                    continue;
+                } catch (WRITE_PROTECTED_EXCEPTION &e){
+                    total_cost += 420;  // 420 fuck yeah!! smoke that shit baby
+                    current_process->segprot += 1;
+                    f_trace("%s", "SEGPROT");
+                    continue;
+                };
             }
             // check the write protection of pte
             // update the referenced and modified bits of pte
+            if (current_command == 'w') pte->modified = 1;
+            x_trace("%s", current_process->print_page_table().c_str());
+            f_trace("%s", print_frame_table().c_str());
+        }
+        if (P_option){
+            for (Process *proc : processes){
+                P_trace("%s", proc->print_page_table().c_str());
+            }
+        }
+        F_trace("%s", print_frame_table().c_str());
+        if (S_option){
+            for (Process *proc : processes){
+                    printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
+                           proc->process_id,
+                           proc->unmaps, proc->maps, proc->ins,
+                           proc->outs, proc->fins, proc->fouts,
+                           proc->zeros, proc->segv, proc->segprot);
+            }
+            printf("TOTALCOST %lu %lu %lu %llu %lu\n", instruction_number, ctx_switches, process_exits, total_cost, sizeof(PageTableEntry));
         }
     }
 };
@@ -296,16 +509,71 @@ public:
 
 
 int main(int argc, char* argv[]){
-    // TODO: use getopt to find the flags, input file and output file.
-    // This is going to be replace by getopt at some point
-    string input_file = "/Users/tomasortega/Desktop/os_lab3/lab3_assign/inputs/in3";
-    string rfile = "/Users/tomasortega/Desktop/os_lab3/lab3_assign/inputs/rfile";
-    Pager *pager = new FIFO;
+    string usage = "./mmu –f<num_frames> -a<algo> [-o<options>] inputfile randomfile";
+    int c;
+    char alg;
+    Pager *p;
+    while ((c = getopt(argc, argv, "F:f:A:a:O:o:")) != -1)  {
+        switch(c){
+            case 'f':
+            case 'F':
+                number_of_frames = stoi(optarg);
+                if (MAX_FRAMES < number_of_frames){
+                    exit(0); // even though this is never going to be tested so why bother with this bullshit
+                }
+                break;
+            case 'a':
+            case 'A':
+                alg = optarg[0];
+                switch(alg){
+                    case 'f':
+                    case 'F':
+                        p = new FIFO();
+                        break;
+                    case 'r':
+                    case 'R':
+                        p = new Random();
+                        break;
+                    case 'c':
+                    case 'C':
+                        p = new Clock();
+                        break;
+                    case 'e':
+                    case 'E':
+                        p = new EnhancedSecondChance();
+                        break;
+                    case 'a':
+                    case 'A':
+                        p = new Aging();
+                        break;
+                    case 'w':
+                    case 'W':
+                        p = new WorkingSet();
+                        break;
+                }
+                break;
+            case 'O':
+            case 'o':
+                string option_string(optarg);
+                for (char const &option: option_string) {
+                    if (option == 'O') O_option = 1;
+                    if (option == 'P') P_option = 1;
+                    if (option == 'F') F_option = 1;
+                    if (option == 'S') S_option = 1;
+                    if (option == 'x') x_option = 1;
+                    if (option == 'y') y_option = 1;
+                    if (option == 'f') f_option = 1;
+                    if (option == 'a') a_option = 1;
+                }
+                break;
+        }
+    }
+    string input_file = argv[optind];
+    string random_file = argv[optind+1];
     read_input_file(input_file);
-    read_random_file(rfile);
-    cout << sizeof(PageTableEntry) << endl;
+    read_random_file(random_file);
     // Start the simulation
-    Simulation s(pager);
+    Simulation s(p);
     s.run_simulation();
     return 0;
 }
