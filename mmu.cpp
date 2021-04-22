@@ -235,7 +235,6 @@ public:
 };
 class Clock : public Pager{
 public:
-    // TODO: implement Clock pager
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
         return nullptr;
