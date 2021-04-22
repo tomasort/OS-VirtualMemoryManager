@@ -97,10 +97,12 @@ public:
 
 class Pager{
 public:
+    static int hand;
     // The select_victim_frame function returns a victim frame
     // Pure virtual function
     virtual Frame* select_victim_frame() = 0;
 };
+int Pager::hand = 0;
 
 class PageTableEntry{
 public:
@@ -195,10 +197,11 @@ public:
 
 int Process::process_counter = 0;
 int* random_values = nullptr;
-int number_of_random_values;
+unsigned long number_of_random_values;
 int number_of_frames;
 vector<Process*> processes;
 vector<Instruction*> instructions;
+unsigned long instruction_number = 0;
 Frame *frame_table;  //Provide this reverse mapping (frame => <proc-id,vpage>) inside each frame’s frame table entry.
 
 
@@ -245,7 +248,6 @@ public:
 };
 class Clock : public Pager{
 public:
-    static int hand;
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
         int counter = 0;
@@ -263,16 +265,53 @@ public:
         }
     };
 };
-int Clock::hand = 0;
 
 class EnhancedSecondChance : public Pager{
 public:
-    // TODO: Implement EnhancedSecondChance pager
+    static unsigned int _previous_instruction;
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
-        return nullptr;
+        bool classes[4] = {0, 0, 0, 0};
+        Frame *frame_options[4];
+        Frame *selected_frame = nullptr;
+        int hand_options[4];
+        int reset = 0;
+        int i = hand;
+        int old_hand = hand;
+        while (true){
+            int ref = processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced;
+            int mod = processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].modified;
+            int _class = 2*ref + mod;
+            if(!classes[_class]){
+                classes[_class] = true;
+                hand_options[_class] = i+1%number_of_frames;
+                frame_options[_class] = &frame_table[i%number_of_frames];
+            }
+            if (instruction_number-_previous_instruction >= 50){
+                reset = 1;
+                // we need to reset every referenced bit for every valid page
+                processes[frame_table[i].process_id]->page_table[frame_table[i].vpage].referenced = 0;
+            }else if (classes[0]){
+                break;
+            }
+            if (i-old_hand == number_of_frames-1){
+                break;
+            }
+            i++;
+        }
+        _previous_instruction = instruction_number;
+        for(int j = 0; j < 4; j++){
+            if(classes[j]){
+                selected_frame = frame_options[j];
+                hand = hand_options[j];
+                a_trace("ASELECT: hand=%2d %d | %d %2d %2d", old_hand, reset, j, selected_frame->frame_id, i-old_hand+1);
+                break;
+            }
+        }
+        return selected_frame;
     };
 };
+unsigned int EnhancedSecondChance::_previous_instruction = 0;
 class Aging : public Pager{
 public:
     // TODO: Implement Aging pager
@@ -350,7 +389,6 @@ public:
     Pager *pager;
 
     // stats
-    unsigned long instruction_number = 0;
     unsigned long process_exits = 0;
     unsigned long long total_cost = 0;
     unsigned long ctx_switches = 0;
