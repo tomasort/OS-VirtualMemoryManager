@@ -1,0 +1,80 @@
+0: ==> c 0
+1: ==> r 15
+ ZERO
+ MAP 0
+2: ==> r 3
+ ZERO
+ MAP 1
+3: ==> r 0
+ ZERO
+ MAP 2
+4: ==> r 9
+ ZERO
+ MAP 3
+5: ==> r 5
+ ZERO
+ MAP 4
+6: ==> r 2
+ ZERO
+ MAP 5
+7: ==> r 28
+ ZERO
+ MAP 6
+8: ==> r 22
+ ZERO
+ MAP 7
+9: ==> r 23
+ ZERO
+ MAP 8
+10: ==> r 2
+11: ==> r 3
+12: ==> r 8
+ ZERO
+ MAP 9
+13: ==> r 9
+14: ==> r 10
+ ZERO
+ MAP 10
+15: ==> r 12
+ ZERO
+ MAP 11
+16: ==> w 37
+ ZERO
+ MAP 12
+17: ==> c 1
+18: ==> r 2
+ ZERO
+ MAP 13
+19: ==> r 0
+ ZERO
+ MAP 14
+20: ==> r 0
+21: ==> r 0
+22: ==> r 9
+ ZERO
+ MAP 15
+23: ==> r 14
+ UNMAP 0:23
+ ZERO
+ MAP 8
+24: ==> r 3
+ UNMAP 0:22
+ ZERO
+ MAP 7
+25: ==> r 44
+ UNMAP 0:10
+ ZERO
+ MAP 10
+26: ==> w 35
+ UNMAP 0:5
+ ZERO
+ MAP 4
+27: ==> r 0
+28: ==> w 53
+ UNMAP 0:0
+ ZERO
+ MAP 2
+29: ==> r 7
+ ZERO
+ MAP 49
+30: ==> r 26
