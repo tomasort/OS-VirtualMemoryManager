@@ -215,12 +215,21 @@ public:
         return &frame_table[(hand++)%number_of_frames];
     };
 };
+
+int get_random(){
+    // Function that returns a "random" value using the number in the file provided by the user
+    static int offset = 0;
+    if (offset >= number_of_random_values){
+        offset = 0;
+    }
+    int random_number = 1 + random_values[offset++]%number_of_frames;
+    return random_number;
+}
 class Random : public Pager{
 public:
-    // TODO: implement random pager
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
-        return nullptr;
+        return &frame_table[get_random()];
     };
 };
 class Clock : public Pager{
@@ -264,16 +273,6 @@ void read_random_file(const string& file_name){
     for (int i = 0; i < number_of_random_values; i++){
         file >> random_values[i];
     }
-}
-
-int get_random(){
-    // Function that returns a "random" value using the number in the file provided by the user
-    static int offset = 0;
-    if (offset >= number_of_random_values){
-        offset = 0;
-    }
-    int random_number = 1 + random_values[offset++]%number_of_frames;
-    return random_number;
 }
 
 void read_input_file(const string& file_name){
