@@ -222,9 +222,10 @@ int get_random(){
     if (offset >= number_of_random_values){
         offset = 0;
     }
-    int random_number = 1 + random_values[offset++]%number_of_frames;
+    int random_number = random_values[offset++]%number_of_frames;
     return random_number;
 }
+
 class Random : public Pager{
 public:
     Frame* select_victim_frame() override{
