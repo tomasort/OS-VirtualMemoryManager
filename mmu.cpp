@@ -121,7 +121,7 @@ public:
     string print(){
         // # for not valid entries that have been swapped out
         // * for not valid entries that don't have a swap are associated with them.
-        if (pagedout && !present){
+        if (pagedout && !present && !file_mapped){
             return "#";
         }
         if (!is_valid_vma || !present){
@@ -179,9 +179,9 @@ public:
             }else{
                 s = s + to_string(i) + ":" + p.print();
             }
-            if (i < MAX_VPAGES-1){
-                s = s + " ";
-            }
+//            if (i < MAX_VPAGES-1){
+            s = s + " ";
+//            }
         }
         return s;
     }
@@ -200,9 +200,9 @@ string print_frame_table(){
     string s = "FT: ";
     for (int i = 0; i < number_of_frames; i++){
         s = s + frame_table[i].print();
-        if (i < number_of_frames-1){
-            s = s + " ";
-        }
+//        if (i < number_of_frames-1){
+        s = s + " ";
+//        }
     }
     return s;
 }
@@ -362,6 +362,26 @@ public:
         return frame;
     }
 
+    void return_frames(){
+        for(PageTableEntry &pte : current_process->page_table) {
+            if(pte.present){
+                Frame* frame = &frame_table[pte.frame];
+                processes[frame->process_id]->unmaps += 1;
+                total_cost += 400;
+                O_trace(" UNMAP %s", frame->print().c_str());
+                frame->initialized = 0;
+                free_list.push(frame);
+                if (pte.file_mapped && pte.modified) {
+                    processes[frame->process_id]->fouts += 1;
+                    total_cost += 2400;
+                    O_trace(" FOUT");
+                }
+            }
+            pte.present = 0;
+            pte.pagedout = 0;
+        }
+    }
+
     void page_fault_handler(int virtual_page){
         // The frame table can only be accessed as part of the “simulated page fault handler”
         // verify this is actually a valid page in a VMA if not raise an ERROR and go to the next instruction
@@ -384,22 +404,22 @@ public:
         Frame *new_frame = get_frame();
         pte->frame = new_frame->frame_id;
         if (new_frame->initialized){
-            current_process->unmaps += 1;
+            processes[new_frame->process_id]->unmaps += 1;
             total_cost += 400;
-            O_trace("UNMAP %s", new_frame->print().c_str());
+            O_trace(" UNMAP %s", new_frame->print().c_str());
             int old_vpage = new_frame->vpage;
             PageTableEntry *old_pte = &(processes[new_frame->process_id]->page_table[old_vpage]);
             old_pte->present = 0;
             if (old_pte->modified){
-                old_pte->pagedout = 1;
                 if (old_pte->file_mapped){
-                    current_process->fouts += 1;
+                    processes[new_frame->process_id]->fouts += 1;
                     total_cost += 2400;
-                    O_trace("FOUT");
+                    O_trace(" FOUT");
                 }else{
-                    current_process->outs += 1;
+                    old_pte->pagedout = 1;
+                    processes[new_frame->process_id]->outs += 1;
                     total_cost += 2700;
-                    O_trace("OUT");
+                    O_trace(" OUT");
                 }
             }
         }
@@ -407,16 +427,16 @@ public:
             if (pte->file_mapped){
                 current_process->fins += 1;
                 total_cost += 2800;
-                O_trace("FIN");
+                O_trace(" FIN");
             }else{
                 current_process->ins += 1;
                 total_cost += 3100;
-                O_trace("IN");
+                O_trace(" IN");
             }
         }else if (!new_frame->initialized || (!pte->pagedout && !pte->file_mapped)){
             current_process->zeros += 1;
             total_cost += 140;
-            O_trace("ZERO");
+            O_trace(" ZERO");
         }
         // Populate new_frame
         new_frame->process_id = current_process->process_id;
@@ -434,7 +454,7 @@ public:
         // to the swap device (“OUT”) or in case it was file mapped written back to the file (“FOUT”)
         current_process->maps += 1;
         total_cost += 300;
-        O_trace("MAP %d", new_frame->frame_id);
+        O_trace(" MAP %d", new_frame->frame_id);
     }
 
     bool get_next_instruction(Instruction **instruction){
@@ -447,9 +467,13 @@ public:
         while(get_next_instruction(&current_instruction)){
             char current_command= current_instruction->cmd;
             int current_argument= current_instruction->arg;
+//            if (instruction_number == 43){
+//                ;
+//            }
             O_trace("%lu: ==> %c %d", instruction_number - 1, current_instruction->cmd, current_instruction->arg);
             if (current_command == 'e'){  // We need to exit
-                cout << "The command is e!";
+                O_trace("EXIT current process %d", current_process->process_id);
+                return_frames();
                 process_exits++;
                 total_cost += 1250;
                 continue;
@@ -463,27 +487,27 @@ public:
             // Handle the instructions "r" and "w"
             total_cost++;
             PageTableEntry *pte = &(current_process->page_table[current_instruction->arg]);
-            if (!pte->present){
+            try{
                 // The hardware would raise a page fault exception.
-                try{
+                if (!pte->present){
                     page_fault_handler(current_argument);
-                    if (current_command == 'w' || current_command == 'r') pte->referenced = 1;
-                    if (current_command == 'w' && pte->write_protected) throw WRITE_PROTECTED_EXCEPTION();
-                } catch (INVALID_VPAGE_EXCEPTION &e){
-                    total_cost += 340;
-                    current_process->segv += 1;
-                    f_trace("%s", "SEGV");
-                    continue;
-                } catch (WRITE_PROTECTED_EXCEPTION &e){
-                    total_cost += 420;  // 420 fuck yeah!! smoke that shit baby
-                    current_process->segprot += 1;
-                    f_trace("%s", "SEGPROT");
-                    continue;
-                };
-            }
+                }
+                if (current_command == 'w' || current_command == 'r') pte->referenced = 1;
+                if (current_command == 'w' && pte->write_protected) throw WRITE_PROTECTED_EXCEPTION();
+                if (current_command == 'w') pte->modified = 1;
+            } catch (INVALID_VPAGE_EXCEPTION &e){
+                total_cost += 340;
+                current_process->segv += 1;
+                O_trace("%s", " SEGV");
+                continue;
+            } catch (WRITE_PROTECTED_EXCEPTION &e){
+                total_cost += 420;  // 420 fuck yeah!! smoke that shit baby
+                current_process->segprot += 1;
+                O_trace("%s", " SEGPROT");
+                continue;
+            };
             // check the write protection of pte
             // update the referenced and modified bits of pte
-            if (current_command == 'w') pte->modified = 1;
             x_trace("%s", current_process->print_page_table().c_str());
             f_trace("%s", print_frame_table().c_str());
         }
@@ -496,10 +520,8 @@ public:
         if (S_option){
             for (Process *proc : processes){
                     printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
-                           proc->process_id,
-                           proc->unmaps, proc->maps, proc->ins,
-                           proc->outs, proc->fins, proc->fouts,
-                           proc->zeros, proc->segv, proc->segprot);
+                           proc->process_id, proc->unmaps, proc->maps, proc->ins, proc->outs,
+                           proc->fins, proc->fouts, proc->zeros, proc->segv, proc->segprot);
             }
             printf("TOTALCOST %lu %lu %lu %llu %lu\n", instruction_number, ctx_switches, process_exits, total_cost, sizeof(PageTableEntry));
         }
