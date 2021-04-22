@@ -16,6 +16,7 @@
 using namespace std;
 
 #define MAX_VPAGES 64
+#define SPACING 0
 #define MAX_FRAMES 128
 bool O_option;
 bool P_option;
@@ -179,9 +180,14 @@ public:
             }else{
                 s = s + to_string(i) + ":" + p.print();
             }
-//            if (i < MAX_VPAGES-1){
-            s = s + " ";
-//            }
+            if(SPACING){
+                if (i < MAX_VPAGES-1){
+                    s = s + " ";
+                }
+            }
+            else{
+                s = s + " ";
+            }
         }
         return s;
     }
@@ -200,9 +206,13 @@ string print_frame_table(){
     string s = "FT: ";
     for (int i = 0; i < number_of_frames; i++){
         s = s + frame_table[i].print();
-//        if (i < number_of_frames-1){
-        s = s + " ";
-//        }
+        if(SPACING){
+            if (i < number_of_frames-1){
+                s = s + " ";
+            }
+        }else{
+            s = s + " ";
+        }
     }
     return s;
 }
@@ -235,11 +245,26 @@ public:
 };
 class Clock : public Pager{
 public:
+    static int hand;
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
-        return nullptr;
+        int counter = 0;
+        // to so we go through the page table and find one with the reference bit set to 0
+        int i = hand;
+        while (true){
+            if (processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced==1){
+                processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced = 0;
+                i++;
+            }else{
+                a_trace("ASELECT %d %d", hand, i-hand+1);
+                hand = i%number_of_frames + 1;
+                return &frame_table[i%number_of_frames];
+            }
+        }
     };
 };
+int Clock::hand = 0;
+
 class EnhancedSecondChance : public Pager{
 public:
     // TODO: Implement EnhancedSecondChance pager
