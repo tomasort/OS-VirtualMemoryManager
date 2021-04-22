@@ -284,13 +284,16 @@ public:
             int _class = 2*ref + mod;
             if(!classes[_class]){
                 classes[_class] = true;
-                hand_options[_class] = i+1%number_of_frames;
+                hand_options[_class] = (i+1)%number_of_frames;
                 frame_options[_class] = &frame_table[i%number_of_frames];
+            }
+            if (instruction_number == 49){
+                ;
             }
             if (instruction_number-_previous_instruction >= 50){
                 reset = 1;
                 // we need to reset every referenced bit for every valid page
-                processes[frame_table[i].process_id]->page_table[frame_table[i].vpage].referenced = 0;
+                processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced = 0;
             }else if (classes[0]){
                 break;
             }
@@ -299,7 +302,9 @@ public:
             }
             i++;
         }
-        _previous_instruction = instruction_number;
+        if (reset){
+            _previous_instruction = instruction_number;
+        }
         for(int j = 0; j < 4; j++){
             if(classes[j]){
                 selected_frame = frame_options[j];

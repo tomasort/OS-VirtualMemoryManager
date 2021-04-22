@@ -10,6 +10,9 @@ diff -b -q --speed-large-files ../refout/out2_16_a ../../my_output//out2_16_a fa
 diff -b -q --speed-large-files ../refout/out2_16_w ../../my_output//out2_16_w failed
    DIR1-SUM ==> TOTALCOST 31 1 0 32820 4
    DIR2-SUM ==> 
+diff -b -q --speed-large-files ../refout/out3_16_f ../../my_output//out3_16_f failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 86550 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 132990 4
 diff -b -q --speed-large-files ../refout/out3_16_e ../../my_output//out3_16_e failed
    DIR1-SUM ==> TOTALCOST 101 1 0 86550 4
    DIR2-SUM ==> TOTALCOST 101 1 0 61390 4
