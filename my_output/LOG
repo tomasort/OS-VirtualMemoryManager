@@ -1,6 +1,3 @@
-diff -b -q --speed-large-files ../refout/out1_16_a ../../my_output//out1_16_a failed
-   DIR1-SUM ==> TOTALCOST 31 1 0 26400 4
-   DIR2-SUM ==> TOTALCOST 31 1 0 26400 4
 diff -b -q --speed-large-files ../refout/out1_16_w ../../my_output//out1_16_w failed
    DIR1-SUM ==> TOTALCOST 31 1 0 26400 4
    DIR2-SUM ==> 
