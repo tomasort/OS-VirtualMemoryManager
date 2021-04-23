@@ -81,9 +81,11 @@ public:
     int vpage;
     int frame_id;
     int initialized;
+    unsigned int age;
 
     Frame(){
         initialized = 0;
+        age = 0;
     }
     string print(){
         if (initialized){
@@ -202,7 +204,7 @@ int number_of_frames;
 vector<Process*> processes;
 vector<Instruction*> instructions;
 unsigned long instruction_number = 0;
-Frame *frame_table;  //Provide this reverse mapping (frame => <proc-id,vpage>) inside each frame’s frame table entry.
+Frame frame_table[128];  //Provide this reverse mapping (frame => <proc-id,vpage>) inside each frame’s frame table entry.
 
 
 string print_frame_table(){
@@ -250,7 +252,6 @@ class Clock : public Pager{
 public:
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
-        int counter = 0;
         // to so we go through the page table and find one with the reference bit set to 0
         int i = hand;
         while (true){
@@ -287,9 +288,6 @@ public:
                 hand_options[_class] = (i+1)%number_of_frames;
                 frame_options[_class] = &frame_table[i%number_of_frames];
             }
-            if (instruction_number == 49){
-                ;
-            }
             if (instruction_number-_previous_instruction >= 50){
                 reset = 1;
                 // we need to reset every referenced bit for every valid page
@@ -317,12 +315,47 @@ public:
     };
 };
 unsigned int EnhancedSecondChance::_previous_instruction = 0;
+
 class Aging : public Pager{
 public:
     // TODO: Implement Aging pager
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
-        return nullptr;
+        int i = hand;
+        int scanned = i;
+        int old_hand = hand;
+        int min_age = 0;
+        bool found = false;
+        Frame *selected_frame = &frame_table[i%number_of_frames];
+        hand = (hand+1)%number_of_frames;
+        string s = "";
+        char hex_string[32];
+        // TODO: something is wrong with the way the hand is working. It needs fixing!
+        while (true){
+            unsigned int age = frame_table[i%number_of_frames].age;
+            age = age >> 1;
+            if(processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced){
+                age = (age | 0x80000000);
+            }
+            frame_table[i%number_of_frames].age = age;
+            processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced = 0;
+            sprintf(hex_string, "%x", age);
+            s += to_string(i%number_of_frames) + ":" + string(hex_string) + " ";
+            if (age < min_age || (age == min_age && !found)){
+                hand = (i+1)%number_of_frames;
+                selected_frame = &frame_table[i%number_of_frames];
+                min_age = age;
+                found = true;
+            }
+            if (i-old_hand == number_of_frames-1){
+                break;
+            }
+            i++;
+        }
+        s = "ASELECT " + to_string(old_hand) + "-" + to_string(i%number_of_frames) + " | " + s;
+        s += "| " + to_string(selected_frame->frame_id);
+        a_trace("%s", s.c_str());
+        return selected_frame;
     };
 };
 class WorkingSet : public Pager{
@@ -400,7 +433,6 @@ public:
 
     Simulation(Pager *p){
         pager = p;
-        frame_table = new Frame[number_of_frames];
         for (int i = 0; i < number_of_frames; i++){
             frame_table[i] = Frame();
             frame_table[i].frame_id = i;
@@ -521,6 +553,7 @@ public:
         // to the swap device (“OUT”) or in case it was file mapped written back to the file (“FOUT”)
         current_process->maps += 1;
         total_cost += 300;
+        new_frame->age = 0;
         O_trace(" MAP %d", new_frame->frame_id);
     }
 
@@ -572,7 +605,7 @@ public:
                 current_process->segprot += 1;
                 O_trace("%s", " SEGPROT");
                 continue;
-            };
+            }
             // check the write protection of pte
             // update the referenced and modified bits of pte
             x_trace("%s", current_process->print_page_table().c_str());
