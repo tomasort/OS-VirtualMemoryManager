@@ -324,9 +324,9 @@ public:
         int i = hand;
         int scanned = i;
         int old_hand = hand;
-        int min_age = 0;
         bool found = false;
         Frame *selected_frame = &frame_table[i%number_of_frames];
+        unsigned int min_age = frame_table[i%number_of_frames].age;
         hand = (hand+1)%number_of_frames;
         string s = "";
         char hex_string[32];
@@ -336,6 +336,9 @@ public:
             age = age >> 1;
             if(processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced){
                 age = (age | 0x80000000);
+            }
+            if(instruction_number == 47){
+                ;
             }
             frame_table[i%number_of_frames].age = age;
             processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced = 0;
