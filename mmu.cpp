@@ -325,9 +325,8 @@ public:
         int scanned = i;
         int old_hand = hand;
         bool found = false;
-        Frame *selected_frame = &frame_table[i%number_of_frames];
-        unsigned int min_age = frame_table[i%number_of_frames].age;
-        hand = (hand+1)%number_of_frames;
+        Frame *selected_frame;
+        unsigned int min_age = 0;
         string s = "";
         char hex_string[32];
         // TODO: something is wrong with the way the hand is working. It needs fixing!
@@ -337,10 +336,12 @@ public:
             if(processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced){
                 age = (age | 0x80000000);
             }
-            if(instruction_number == 47){
-                ;
-            }
             frame_table[i%number_of_frames].age = age;
+            if(i == old_hand){
+                min_age = frame_table[i%number_of_frames].age;
+                hand = (hand+1)%number_of_frames;
+                selected_frame = &frame_table[i%number_of_frames];
+            }
             processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced = 0;
             sprintf(hex_string, "%x", age);
             s += to_string(i%number_of_frames) + ":" + string(hex_string) + " ";
@@ -595,9 +596,13 @@ public:
                 if (!pte->present){
                     page_fault_handler(current_argument);
                 }
+                // check the write protection of pte
+                // update the referenced and modified bits of pte
                 if (current_command == 'w' || current_command == 'r') pte->referenced = 1;
                 if (current_command == 'w' && pte->write_protected) throw WRITE_PROTECTED_EXCEPTION();
                 if (current_command == 'w') pte->modified = 1;
+                x_trace("%s", current_process->print_page_table().c_str());
+                f_trace("%s", print_frame_table().c_str());
             } catch (INVALID_VPAGE_EXCEPTION &e){
                 total_cost += 340;
                 current_process->segv += 1;
@@ -607,12 +612,10 @@ public:
                 total_cost += 420;  // 420 fuck yeah!! smoke that shit baby
                 current_process->segprot += 1;
                 O_trace("%s", " SEGPROT");
+                x_trace("%s", current_process->print_page_table().c_str());
+                f_trace("%s", print_frame_table().c_str());
                 continue;
             }
-            // check the write protection of pte
-            // update the referenced and modified bits of pte
-            x_trace("%s", current_process->print_page_table().c_str());
-            f_trace("%s", print_frame_table().c_str());
         }
         if (P_option){
             for (Process *proc : processes){
