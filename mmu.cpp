@@ -103,6 +103,7 @@ public:
     // The select_victim_frame function returns a victim frame
     // Pure virtual function
     virtual Frame* select_victim_frame() = 0;
+    virtual void update_age(Frame *frame){ ; };
 };
 int Pager::hand = 0;
 
@@ -116,11 +117,10 @@ public:
     unsigned pagedout:1;
     unsigned file_mapped:1;
     unsigned is_valid_vma:1;
-    unsigned swap_area:1;
-    unsigned other:16;
+    unsigned other:17;
 
     PageTableEntry(){
-        frame = file_mapped = swap_area = is_valid_vma = present = referenced = modified = write_protected = pagedout = other =  0;
+        frame = file_mapped = is_valid_vma = present = referenced = modified = write_protected = pagedout = other =  0;
 
     }
     string print(){
@@ -248,6 +248,7 @@ public:
         return &frame_table[get_random()];
     };
 };
+
 class Clock : public Pager{
 public:
     Frame* select_victim_frame() override{
@@ -318,18 +319,18 @@ unsigned int EnhancedSecondChance::_previous_instruction = 0;
 
 class Aging : public Pager{
 public:
-    // TODO: Implement Aging pager
+    void update_age(Frame *frame) override{
+        frame->age = 0;
+    };
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
         int i = hand;
-        int scanned = i;
         int old_hand = hand;
         bool found = false;
         Frame *selected_frame;
         unsigned int min_age = 0;
         string s = "";
         char hex_string[32];
-        // TODO: something is wrong with the way the hand is working. It needs fixing!
         while (true){
             unsigned int age = frame_table[i%number_of_frames].age;
             age = age >> 1;
@@ -362,12 +363,64 @@ public:
         return selected_frame;
     };
 };
+
 class WorkingSet : public Pager{
 public:
+    void update_age(Frame *frame) override{
+        frame->age = instruction_number-1;
+    };
     // TODO: Implement WorkingSet pager
+    static const int tau = 49;
     Frame* select_victim_frame() override{
         // This function selects a frame to UNMAP
-        return nullptr;
+        int i = hand;
+        int old_hand = hand;
+        bool found = false;
+        Frame *selected_frame;
+        unsigned int min_age = 0;
+        string s = "";
+        char _string[32];
+        while (true){
+            unsigned int age = instruction_number-frame_table[i%number_of_frames].age;
+            int referenced = processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced;
+            Frame *current_frame = &frame_table[i%number_of_frames];
+            int previous_age = current_frame->age;
+            if(referenced){
+                // set the time of last use to current time
+                current_frame->age = instruction_number-1;
+                processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced = 0;
+            }
+            if (!referenced && (age > tau)){
+                hand = (hand+1)%number_of_frames;  // hand of the next page after the selected one (in this case the first one)
+                selected_frame = current_frame;
+                found = true;
+            }
+//            if (!referenced && (age <= tau)){
+                if(i == old_hand && !found){
+                    // initialize the variable to store the minimum
+                    min_age = current_frame->age;
+                    hand = (hand+1)%number_of_frames;  // hand of the next page after the selected one (in this case the first one)
+                    selected_frame = current_frame;
+                }
+                if (current_frame->age < min_age && !found){
+                    // update the minimum if we find it
+                    hand = (i+1)%number_of_frames;
+                    selected_frame = &frame_table[i%number_of_frames];
+                    min_age = age;
+                }
+//            }
+            sprintf(_string, "%d(%d %d:%d %d) ", current_frame->frame_id, referenced, current_frame->process_id, current_frame->vpage, previous_age);
+            s += string(_string);
+            if (i-old_hand == number_of_frames-1){
+                // We have visited every single page.
+                break;
+            }
+            i++;
+        }
+        s = "ASELECT " + to_string(old_hand) + "-" + to_string(i%number_of_frames) + " | " + s;
+        s += "| " + to_string(selected_frame->frame_id);
+        a_trace("%s", s.c_str());
+        return selected_frame;
     };
 };
 
@@ -557,7 +610,7 @@ public:
         // to the swap device (“OUT”) or in case it was file mapped written back to the file (“FOUT”)
         current_process->maps += 1;
         total_cost += 300;
-        new_frame->age = 0;
+        pager->update_age(new_frame);
         O_trace(" MAP %d", new_frame->frame_id);
     }
 
