@@ -1,54 +1,6 @@
-diff -b -q --speed-large-files ../refout/out3_16_w ../../my_output//out3_16_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 132990 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 136790 4
-diff -b -q --speed-large-files ../refout/out3_32_w ../../my_output//out3_32_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 75730 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 80290 4
-diff -b -q --speed-large-files ../refout/out4_16_w ../../my_output//out4_16_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 138590 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 140450 4
-diff -b -q --speed-large-files ../refout/out4_32_w ../../my_output//out4_32_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 78370 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 74830 4
-diff -b -q --speed-large-files ../refout/out5_16_w ../../my_output//out5_16_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 220590 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 220590 4
-diff -b -q --speed-large-files ../refout/out5_32_w ../../my_output//out5_32_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 153370 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 156070 4
-diff -b -q --speed-large-files ../refout/out6_16_w ../../my_output//out6_16_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 147770 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 146930 4
-diff -b -q --speed-large-files ../refout/out6_32_w ../../my_output//out6_32_w failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 100150 4
-   DIR2-SUM ==> TOTALCOST 101 1 0 102850 4
-diff -b -q --speed-large-files ../refout/out7_16_w ../../my_output//out7_16_w failed
-   DIR1-SUM ==> TOTALCOST 213 13 0 308090 4
-   DIR2-SUM ==> TOTALCOST 213 13 0 311890 4
-diff -b -q --speed-large-files ../refout/out7_32_w ../../my_output//out7_32_w failed
-   DIR1-SUM ==> TOTALCOST 213 13 0 185010 4
-   DIR2-SUM ==> TOTALCOST 213 13 0 200710 4
-diff -b -q --speed-large-files ../refout/out8_16_w ../../my_output//out8_16_w failed
-   DIR1-SUM ==> TOTALCOST 210 10 0 368400 4
-   DIR2-SUM ==> TOTALCOST 210 10 0 368400 4
-diff -b -q --speed-large-files ../refout/out8_32_w ../../my_output//out8_32_w failed
-   DIR1-SUM ==> TOTALCOST 210 10 0 273020 4
-   DIR2-SUM ==> TOTALCOST 210 10 0 278240 4
-diff -b -q --speed-large-files ../refout/out9_16_w ../../my_output//out9_16_w failed
-   DIR1-SUM ==> TOTALCOST 1051 51 0 2783210 4
-   DIR2-SUM ==> TOTALCOST 1051 51 0 2780250 4
-diff -b -q --speed-large-files ../refout/out9_32_w ../../my_output//out9_32_w failed
-   DIR1-SUM ==> TOTALCOST 1051 51 0 2704290 4
-   DIR2-SUM ==> TOTALCOST 1051 51 0 2701510 4
-diff -b -q --speed-large-files ../refout/out10_16_w ../../my_output//out10_16_w failed
-   DIR1-SUM ==> TOTALCOST 5243 243 0 13228750 4
-   DIR2-SUM ==> TOTALCOST 5243 243 0 13252810 4
 diff -b -q --speed-large-files ../refout/out10_32_w ../../my_output//out10_32_w failed
    DIR1-SUM ==> TOTALCOST 5243 243 0 13138530 4
    DIR2-SUM ==> TOTALCOST 5243 243 0 13138530 4
-diff -b -q --speed-large-files ../refout/out11_16_w ../../my_output//out11_16_w failed
-   DIR1-SUM ==> TOTALCOST 5245 243 2 13597810 4
-   DIR2-SUM ==> TOTALCOST 5245 243 2 13600230 4
 diff -b -q --speed-large-files ../refout/out11_32_w ../../my_output//out11_32_w failed
    DIR1-SUM ==> TOTALCOST 5245 243 2 12793910 4
-   DIR2-SUM ==> TOTALCOST 5245 243 2 12784870 4
+   DIR2-SUM ==> TOTALCOST 5245 243 2 12811470 4

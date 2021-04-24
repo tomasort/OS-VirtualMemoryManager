@@ -380,6 +380,9 @@ public:
         unsigned int min_age = 0;
         string s = "";
         char _string[32];
+        if(instruction_number == 78){
+            ;
+        }
         while (true){
             unsigned int age = instruction_number-frame_table[i%number_of_frames].age;
             int referenced = processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced;
@@ -406,7 +409,7 @@ public:
                     // update the minimum if we find it
                     hand = (i+1)%number_of_frames;
                     selected_frame = &frame_table[i%number_of_frames];
-                    min_age = age;
+                    min_age = current_frame->age;
                 }
 //            }
             sprintf(_string, "%d(%d %d:%d %d) ", current_frame->frame_id, referenced, current_frame->process_id, current_frame->vpage, previous_age);
