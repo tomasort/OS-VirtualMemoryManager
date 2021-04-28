@@ -206,7 +206,6 @@ vector<Instruction*> instructions;
 unsigned long instruction_number = 0;
 Frame frame_table[128];  //Provide this reverse mapping (frame => <proc-id,vpage>) inside each frame’s frame table entry.
 
-
 string print_frame_table(){
     string s = "FT: ";
     for (int i = 0; i < number_of_frames; i++){
@@ -380,40 +379,48 @@ public:
         unsigned int min_age = 0;
         string s = "";
         char _string[32];
-        if(instruction_number == 78){
+        bool scanning = true;
+        if(instruction_number == 3584){
             ;
         }
         while (true){
-            unsigned int age = instruction_number-frame_table[i%number_of_frames].age;
-            int referenced = processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced;
             Frame *current_frame = &frame_table[i%number_of_frames];
+            int referenced = processes[current_frame->process_id]->page_table[current_frame->vpage].referenced;
             int previous_age = current_frame->age;
-            if(referenced){
+            unsigned int age = (instruction_number-1)-current_frame->age;
+            if(referenced && !found){
                 // set the time of last use to current time
                 current_frame->age = instruction_number-1;
                 processes[frame_table[i%number_of_frames].process_id]->page_table[frame_table[i%number_of_frames].vpage].referenced = 0;
             }
-            if (!referenced && (age > tau)){
-                hand = (hand+1)%number_of_frames;  // hand of the next page after the selected one (in this case the first one)
+//            age = instruction_number-frame_table[i%number_of_frames].age;
+            if (!referenced && (age > tau) && !found){
                 selected_frame = current_frame;
+                hand = (i+1)%number_of_frames;  // hand of the next page after the selected one (in this case the first one)
                 found = true;
-            }
-//            if (!referenced && (age <= tau)){
+            }else{
                 if(i == old_hand && !found){
                     // initialize the variable to store the minimum
-                    min_age = current_frame->age;
-                    hand = (hand+1)%number_of_frames;  // hand of the next page after the selected one (in this case the first one)
                     selected_frame = current_frame;
+                    min_age = current_frame->age;
+                    hand = (i+1)%number_of_frames;  // hand of the next page after the selected one (in this case the first one)
                 }
                 if (current_frame->age < min_age && !found){
                     // update the minimum if we find it
                     hand = (i+1)%number_of_frames;
-                    selected_frame = &frame_table[i%number_of_frames];
+                    selected_frame = current_frame;
                     min_age = current_frame->age;
                 }
-//            }
-            sprintf(_string, "%d(%d %d:%d %d) ", current_frame->frame_id, referenced, current_frame->process_id, current_frame->vpage, previous_age);
-            s += string(_string);
+            }
+            if(scanning){
+                sprintf(_string, "%d(%d %d:%d %d) ", current_frame->frame_id, referenced, current_frame->process_id, current_frame->vpage, previous_age);
+                s += string(_string);
+            }
+            if (found && scanning){
+                sprintf(_string, "STOP(%d) ", i-old_hand+1);
+                s += string(_string);
+                scanning = false;
+            }
             if (i-old_hand == number_of_frames-1){
                 // We have visited every single page.
                 break;
