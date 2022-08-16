@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 # Create a module
 
@@ -6,7 +6,6 @@ import random
 import string
 import os
 import time
-#!/usr/local/bin/python3
 
 # print('Starting testing')
 # for i in range(1, 11):
